@@ -196,7 +196,13 @@ namespace ProllE2
             return true;
         }
 
-        // todo: branch operation function, see ArithmeticOperation
+        private bool BranchOperation(Opcode opcode, OpCode branchOp, MethodInfo flag)
+        {
+            ILGen.Emit(OpCodes.Ldarg_2);
+            ILGen.Emit(OpCodes.Callvirt, flag);
+            ILGen.Emit(branchOp, addrToLabel[opcode.GetDestValue()]);
+            return true;
+        }
 
         private bool Nop(Opcode opcode)
         {
@@ -245,33 +251,25 @@ namespace ProllE2
 
         private bool Je(Opcode opcode)
         {
-            ILGen.Emit(OpCodes.Ldarg_2);
-            ILGen.Emit(OpCodes.Callvirt, flagsGetEqualMI);
-            ILGen.Emit(OpCodes.Brtrue, addrToLabel[opcode.GetDestValue()]);
+            BranchOperation(opcode, OpCodes.Brtrue, flagsGetEqualMI);
             return true;
         }
 
         private bool Jne(Opcode opcode)
         {
-            ILGen.Emit(OpCodes.Ldarg_2);
-            ILGen.Emit(OpCodes.Callvirt, flagsGetEqualMI);
-            ILGen.Emit(OpCodes.Brfalse, addrToLabel[opcode.GetDestValue()]);
+            BranchOperation(opcode, OpCodes.Brfalse, flagsGetEqualMI);
             return true;
         }
 
         private bool Jg(Opcode opcode)
         {
-            ILGen.Emit(OpCodes.Ldarg_2);
-            ILGen.Emit(OpCodes.Callvirt, flagsGetGreaterMI);
-            ILGen.Emit(OpCodes.Brtrue, addrToLabel[opcode.GetDestValue()]);
+            BranchOperation(opcode, OpCodes.Brtrue, flagsGetGreaterMI);
             return true;
         }
 
         private bool Jl(Opcode opcode)
         {
-            ILGen.Emit(OpCodes.Ldarg_2);
-            ILGen.Emit(OpCodes.Callvirt, flagsGetLessMI);
-            ILGen.Emit(OpCodes.Brtrue, addrToLabel[opcode.GetDestValue()]);
+            BranchOperation(opcode, OpCodes.Brtrue, flagsGetLessMI);
             return true;
         }
 
