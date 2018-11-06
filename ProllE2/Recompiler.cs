@@ -160,6 +160,7 @@ namespace ProllE2
                 case AddressingMode.immediate:
                     return false;
                 case AddressingMode.memAtReg:
+                    ILGen.Emit(OpCodes.Ldarg_0);
                     ILGen.Emit(OpCodes.Ldarg_1);
                     ILGen.Emit(OpCodes.Ldc_I4, opcode.GetDestValue());
                     ILGen.Emit(OpCodes.Callvirt, regsGetMI);
