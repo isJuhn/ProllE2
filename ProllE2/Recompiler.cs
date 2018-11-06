@@ -186,12 +186,12 @@ namespace ProllE2
             return true;
         }
 
-        private bool ArithmeticOperation(OpCode op, Opcode opcode)
+        private bool ArithmeticOperation(Opcode opcode, OpCode arithmeticOp)
         {
             LoadDest(opcode);
             GetDestValue(opcode);
             GetSourceValue(opcode);
-            ILGen.Emit(op);
+            ILGen.Emit(arithmeticOp);
             SetValue(opcode);
             return true;
         }
@@ -211,42 +211,42 @@ namespace ProllE2
 
         private bool Add(Opcode opcode)
         {
-            return ArithmeticOperation(OpCodes.Add, opcode);
+            return ArithmeticOperation(opcode, OpCodes.Add);
         }
 
         private bool Sub(Opcode opcode)
         {
-            return ArithmeticOperation(OpCodes.Sub, opcode);
+            return ArithmeticOperation(opcode, OpCodes.Sub);
         }
 
         private bool Mul(Opcode opcode)
         {
-            return ArithmeticOperation(OpCodes.Mul, opcode);
+            return ArithmeticOperation(opcode, OpCodes.Mul);
         }
 
         private bool Div(Opcode opcode)
         {
-            return ArithmeticOperation(OpCodes.Div, opcode);
+            return ArithmeticOperation(opcode, OpCodes.Div);
         }
 
         private bool Not(Opcode opcode)
         {
-            return ArithmeticOperation(OpCodes.Not, opcode);
+            return ArithmeticOperation(opcode, OpCodes.Not);
         }
 
         private bool Or(Opcode opcode)
         {
-            return ArithmeticOperation(OpCodes.Or, opcode);
+            return ArithmeticOperation(opcode, OpCodes.Or);
         }
 
         private bool And(Opcode opcode)
         {
-            return ArithmeticOperation(OpCodes.And, opcode);
+            return ArithmeticOperation(opcode, OpCodes.And);
         }
 
         private bool Xor(Opcode opcode)
         {
-            return ArithmeticOperation(OpCodes.Xor, opcode);
+            return ArithmeticOperation(opcode, OpCodes.Xor);
         }
 
         private bool Je(Opcode opcode)
