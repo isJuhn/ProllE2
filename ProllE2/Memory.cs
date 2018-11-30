@@ -25,13 +25,6 @@ namespace ProllE2
             set
             {
                 memory[addr] = (byte)value;
-
-                // todo: check this in IL after every memory write
-                if (addr == 254 && value != 0)
-                {
-                    Console.WriteLine(memory[255]);
-                    memory[254] = 0;
-                }
             }
         }
 

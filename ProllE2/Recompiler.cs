@@ -11,22 +11,17 @@ namespace ProllE2
     class Recompiler : Cpu
     {
         delegate bool OpcodeDelegate(Opcode opcode);
-        delegate bool RecompiledMethodDelegate(Memory memory, Registers registers, Flags flags);
+        delegate bool RecompiledMethodDelegate(byte[] memory, byte[] registers, bool[] flags);
         OpcodeDelegate[] opcodeFunctions;
         RecompiledMethodDelegate recompiledMethod;
-        ILGenerator ILGen;
 
-        // todo: remove
-        MethodInfo regsGetMI = typeof(Registers).GetMethod("get_Item", new Type[] { typeof(int) });
-        MethodInfo regsSetMI = typeof(Registers).GetMethod("set_Item", new Type[] { typeof(int), typeof(int) });
-        MethodInfo memoryGetMI = typeof(Memory).GetMethod("get_Item", new Type[] { typeof(int) });
-        MethodInfo memorySetMI = typeof(Memory).GetMethod("set_Item", new Type[] { typeof(int), typeof(int) });
-        MethodInfo flagsGetEqualMI = typeof(Flags).GetMethod("get_Equal");
-        MethodInfo flagsSetEqualMI = typeof(Flags).GetMethod("set_Equal", new Type[] { typeof(bool) });
-        MethodInfo flagsGetGreaterMI = typeof(Flags).GetMethod("get_Greater");
-        MethodInfo flagsSetGreaterMI = typeof(Flags).GetMethod("set_Greater", new Type[] { typeof(bool) });
-        MethodInfo flagsGetLessMI = typeof(Flags).GetMethod("get_Less");
-        MethodInfo flagsSetLessMI = typeof(Flags).GetMethod("set_Less", new Type[] { typeof(bool) });
+#if DEBUG
+        DebuggingILGenerator ILGen;
+#else
+        ILGenerator ILGen;
+#endif
+
+        MethodInfo writeLineMI = typeof(Console).GetMethod("WriteLine", new Type[] { typeof(int) });
 
         // guest addr -> label map
         Dictionary<int, Label> addrToLabel;
@@ -44,8 +39,7 @@ namespace ProllE2
 
         public override bool Run()
         {
-            // todo: use the underlying array instead of these wrappers
-            return recompiledMethod(memory, registers, flags);
+            return recompiledMethod(memory.GetUnderlyingArray(), registers.GetUnderlyingArray(), flags.GetUnderlyingArray());
         }
 
         public bool Recompile()
@@ -53,8 +47,13 @@ namespace ProllE2
             // guest addr -> opcode map
             Dictionary<int, Opcode> opcodes = new Dictionary<int, Opcode>();
             addrToLabel = new Dictionary<int, Label>();
-            DynamicMethod method = new DynamicMethod("method", typeof(bool), new Type[] { typeof(Memory), typeof(Registers), typeof(Flags) }, typeof(Recompiler).Module);
+            DynamicMethod method = new DynamicMethod("method", typeof(bool), new Type[] { typeof(byte[]), typeof(byte[]), typeof(bool[]) }, typeof(Recompiler).Module);
+
+#if DEBUG
+            ILGen = new DebuggingILGenerator(method.GetILGenerator(), Console.Out);
+#else
             ILGen = method.GetILGenerator();
+#endif
 
             // look for labels and add instructions
             for (int i = 0; i < 250; i += 3)
@@ -79,12 +78,11 @@ namespace ProllE2
                 // mark label
                 if (addrToLabel.ContainsKey(opcodeTuple.Key))
                 {
-                    var label = addrToLabel[opcodeTuple.Key];
+                    Label label = addrToLabel[opcodeTuple.Key];
                     ILGen.MarkLabel(label);
                     addrToLabel[opcodeTuple.Key] = label;
                 }
 
-                // todo: add logging for debug build
                 // recompile instruction
                 if (!opcodeFunctions[(int)opcodeTuple.Value.GetOp()](opcodeTuple.Value))
                 {
@@ -99,11 +97,79 @@ namespace ProllE2
             }
 
             //return true
-            ILGen.Emit(OpCodes.Ldc_I4_S, (byte)1);
+            ILGen.Emit(OpCodes.Ldc_I4_1);
             ILGen.Emit(OpCodes.Ret);
 
             recompiledMethod = (RecompiledMethodDelegate)method.CreateDelegate(typeof(RecompiledMethodDelegate));
 
+#if DEBUG
+            ILGen.PrintAll();
+#endif
+
+            return true;
+        }
+
+        private bool EmitLdc_I4(int value)
+        {
+            switch (value)
+            {
+                case 0:
+                    ILGen.Emit(OpCodes.Ldc_I4_0);
+                    break;
+                case 1:
+                    ILGen.Emit(OpCodes.Ldc_I4_1);
+                    break;
+                case 2:
+                    ILGen.Emit(OpCodes.Ldc_I4_2);
+                    break;
+                case 3:
+                    ILGen.Emit(OpCodes.Ldc_I4_3);
+                    break;
+                case 4:
+                    ILGen.Emit(OpCodes.Ldc_I4_4);
+                    break;
+                case 5:
+                    ILGen.Emit(OpCodes.Ldc_I4_5);
+                    break;
+                case 6:
+                    ILGen.Emit(OpCodes.Ldc_I4_6);
+                    break;
+                case 7:
+                    ILGen.Emit(OpCodes.Ldc_I4_7);
+                    break;
+                case 8:
+                    ILGen.Emit(OpCodes.Ldc_I4_8);
+                    break;
+                default:
+                    ILGen.Emit(OpCodes.Ldc_I4, value);
+                    break;
+            }
+            return true;
+        }
+
+        private bool PrintCheck()
+        {
+            Label label = ILGen.DefineLabel();
+
+            // if (memory[0xfe] != 0)
+            ILGen.Emit(OpCodes.Ldarg_0);
+            ILGen.Emit(OpCodes.Ldc_I4, 0xfe);
+            ILGen.Emit(OpCodes.Ldelem_U1);
+            ILGen.Emit(OpCodes.Brfalse_S, label);
+
+            // Console.WriteLine(memory[0xff]);
+            ILGen.Emit(OpCodes.Ldarg_0);
+            ILGen.Emit(OpCodes.Ldc_I4, 0xff);
+            ILGen.Emit(OpCodes.Ldelem_U1);
+            ILGen.Emit(OpCodes.Call, writeLineMI);
+
+            // memory[0xfe] = 0;
+            ILGen.Emit(OpCodes.Ldarg_0);
+            ILGen.Emit(OpCodes.Ldc_I4, 0xfe);
+            ILGen.Emit(OpCodes.Ldc_I4_0);
+            ILGen.Emit(OpCodes.Stelem_I1);
+
+            ILGen.MarkLabel(label);
             return true;
         }
 
@@ -113,24 +179,26 @@ namespace ProllE2
             {
                 case AddressingMode.reg:
                     ILGen.Emit(OpCodes.Ldarg_1);
-                    ILGen.Emit(OpCodes.Ldc_I4, source);
-                    ILGen.Emit(OpCodes.Callvirt, regsGetMI);
+                    EmitLdc_I4(source);
+                    ILGen.Emit(OpCodes.Ldelem_U1);
                     break;
                 case AddressingMode.memory:
                     ILGen.Emit(OpCodes.Ldarg_0);
-                    ILGen.Emit(OpCodes.Ldc_I4, source);
-                    ILGen.Emit(OpCodes.Callvirt, memoryGetMI);
+                    EmitLdc_I4(source);
+                    ILGen.Emit(OpCodes.Ldelem_U1);
                     break;
                 case AddressingMode.immediate:
-                    ILGen.Emit(OpCodes.Ldc_I4, source);
+                    EmitLdc_I4(source);
                     break;
                 case AddressingMode.memAtReg:
                     ILGen.Emit(OpCodes.Ldarg_0);
                     ILGen.Emit(OpCodes.Ldarg_1);
-                    ILGen.Emit(OpCodes.Ldc_I4, source);
-                    ILGen.Emit(OpCodes.Callvirt, regsGetMI);
-                    ILGen.Emit(OpCodes.Callvirt, memoryGetMI);
+                    EmitLdc_I4(source);
+                    ILGen.Emit(OpCodes.Ldelem_U1);
+                    ILGen.Emit(OpCodes.Ldelem_U1);
                     break;
+                default:
+                    return false;
             }
             return true;
         }
@@ -151,20 +219,22 @@ namespace ProllE2
             {
                 case AddressingMode.reg:
                     ILGen.Emit(OpCodes.Ldarg_1);
-                    ILGen.Emit(OpCodes.Ldc_I4, opcode.GetDestValue());
+                    EmitLdc_I4(opcode.GetDestValue());
                     break;
                 case AddressingMode.memory:
                     ILGen.Emit(OpCodes.Ldarg_0);
-                    ILGen.Emit(OpCodes.Ldc_I4, opcode.GetDestValue());
+                    EmitLdc_I4(opcode.GetDestValue());
                     break;
                 case AddressingMode.immediate:
                     return false;
                 case AddressingMode.memAtReg:
                     ILGen.Emit(OpCodes.Ldarg_0);
                     ILGen.Emit(OpCodes.Ldarg_1);
-                    ILGen.Emit(OpCodes.Ldc_I4, opcode.GetDestValue());
-                    ILGen.Emit(OpCodes.Callvirt, regsGetMI);
+                    EmitLdc_I4(opcode.GetDestValue());
+                    ILGen.Emit(OpCodes.Ldelem_U1);
                     break;
+                default:
+                    return false;
             }
             return true;
         }
@@ -174,13 +244,18 @@ namespace ProllE2
             switch (opcode.GetDestAddrMode())
             {
                 case AddressingMode.reg:
-                    ILGen.Emit(OpCodes.Callvirt, regsSetMI);
+                    ILGen.Emit(OpCodes.Stelem_I1);
                     break;
                 case AddressingMode.memory:
                 case AddressingMode.memAtReg:
-                    ILGen.Emit(OpCodes.Callvirt, memorySetMI);
-                    break;
+                    ILGen.Emit(OpCodes.Stelem_I1);
+                    if (opcode.GetSourceAddrMode() == AddressingMode.immediate && opcode.GetSourceValue() != 0xFE)
+                    {
+                        break;
+                    }
+                    return PrintCheck();
                 case AddressingMode.immediate:
+                default:
                     return false;
             }
             return true;
@@ -196,10 +271,11 @@ namespace ProllE2
             return true;
         }
 
-        private bool BranchOperation(Opcode opcode, OpCode branchOp, MethodInfo flag)
+        private bool BranchOperation(Opcode opcode, OpCode branchOp, int flagsIndex)
         {
             ILGen.Emit(OpCodes.Ldarg_2);
-            ILGen.Emit(OpCodes.Callvirt, flag);
+            ILGen.Emit(OpCodes.Ldc_I4_S, flagsIndex);
+            ILGen.Emit(OpCodes.Ldelem_U1);
             ILGen.Emit(branchOp, addrToLabel[opcode.GetDestValue()]);
             return true;
         }
@@ -251,26 +327,22 @@ namespace ProllE2
 
         private bool Je(Opcode opcode)
         {
-            BranchOperation(opcode, OpCodes.Brtrue, flagsGetEqualMI);
-            return true;
+            return BranchOperation(opcode, OpCodes.Brtrue, 0);
         }
 
         private bool Jne(Opcode opcode)
         {
-            BranchOperation(opcode, OpCodes.Brfalse, flagsGetEqualMI);
-            return true;
+            return BranchOperation(opcode, OpCodes.Brfalse, 0);
         }
 
         private bool Jg(Opcode opcode)
         {
-            BranchOperation(opcode, OpCodes.Brtrue, flagsGetGreaterMI);
-            return true;
+            return BranchOperation(opcode, OpCodes.Brtrue, 1);
         }
 
         private bool Jl(Opcode opcode)
         {
-            BranchOperation(opcode, OpCodes.Brtrue, flagsGetLessMI);
-            return true;
+            return BranchOperation(opcode, OpCodes.Brtrue, 2);
         }
 
         private bool Jmp(Opcode opcode)
@@ -290,20 +362,25 @@ namespace ProllE2
         private bool Cmp(Opcode opcode)
         {
             ILGen.Emit(OpCodes.Ldarg_2);
-            ILGen.Emit(OpCodes.Dup);
-            ILGen.Emit(OpCodes.Dup);
+            ILGen.Emit(OpCodes.Ldc_I4_0);
             GetDestValue(opcode);
             GetSourceValue(opcode);
             ILGen.Emit(OpCodes.Ceq);
-            ILGen.Emit(OpCodes.Callvirt, flagsSetEqualMI);
+            ILGen.Emit(OpCodes.Stelem_I1);
+
+            ILGen.Emit(OpCodes.Ldarg_2);
+            ILGen.Emit(OpCodes.Ldc_I4_1);
             GetDestValue(opcode);
             GetSourceValue(opcode);
             ILGen.Emit(OpCodes.Cgt);
-            ILGen.Emit(OpCodes.Callvirt, flagsSetGreaterMI);
+            ILGen.Emit(OpCodes.Stelem_I1);
+
+            ILGen.Emit(OpCodes.Ldarg_2);
+            ILGen.Emit(OpCodes.Ldc_I4_2);
             GetDestValue(opcode);
             GetSourceValue(opcode);
             ILGen.Emit(OpCodes.Clt);
-            ILGen.Emit(OpCodes.Callvirt, flagsSetLessMI);
+            ILGen.Emit(OpCodes.Stelem_I1);
             return true;
         }
     }

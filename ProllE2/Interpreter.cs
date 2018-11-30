@@ -29,12 +29,12 @@ namespace ProllE2
                 {
                     return false;
                 }
-                /* //todo: start using again
+                 //todo: start using again
                 if ((memory[254]) != 0)
                 {
                     Console.WriteLine(memory[255]);
                     memory[254] = 0;
-                }*/
+                }
 
                 if (registers[0] > 250)
                 {
